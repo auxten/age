@@ -26,10 +26,10 @@ jobs:
 
     - name: Build binary
       run: |
-        GOOS=${{ matrix.platform }} GOARCH=amd64 go build -o age-${{ matrix.platform }} ./cmd/age
+        GOOS=${{ matrix.platform }} GOARCH=amd64 go build -o age .
 
     - name: Zip the binary
-      run: zip age-${{ matrix.platform }}-${{ github.sha }}.zip age-${{ matrix.platform }}
+      run: zip age-${{ matrix.platform }}-${{ github.sha }}.zip age
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
