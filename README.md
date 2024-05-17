@@ -16,6 +16,10 @@ Ensure that `ag` (The Silver Searcher) is installed on your system. For installa
 
 ### Installing AG Enhanced
 
+Download the latest release from the [releases page](https://github.com/auxten/age/releases) and extract the binary to a directory in your `PATH`.
+
+or
+
 Install `age` directly from the source using Go:
 
 ```bash
