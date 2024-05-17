@@ -29,7 +29,7 @@ func main() {
 	// Remaining arguments after parsing flags
 	args := pflag.Args()
 	if len(args) < 2 {
-		fmt.Println("Usage: gl [options] PATTERN dir")
+		fmt.Println("Usage: age [options] PATTERN dir")
 		os.Exit(1)
 	}
 
