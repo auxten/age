@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,16 +12,37 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/spf13/pflag"
+)
+
+// ANSI color codes
+const (
+	Magenta = "\033[35m"
+	Pink    = "\033[38;5;206m" // 256-color mode pink
+	Reset   = "\033[0m"        // Reset all attributes
 )
 
 func main() {
-	if len(os.Args) != 3 {
-		fmt.Println("Usage: ./gl PATTERN dir")
-		return
+	pflag.CommandLine.ParseErrorsWhitelist.UnknownFlags = true
+	pflag.Parse()
+
+	// Remaining arguments after parsing flags
+	args := pflag.Args()
+	if len(args) < 2 {
+		fmt.Println("Usage: gl [options] PATTERN dir")
+		os.Exit(1)
 	}
 
-	pattern := os.Args[1]
-	dir := os.Args[2]
+	pattern := args[0]
+	dir := args[1]
+
+	// Collect all non-parsed options, which might be intended for `ag`
+	var agOptions []string
+	for _, arg := range os.Args[1:] {
+		if strings.HasPrefix(arg, "-") {
+			agOptions = append(agOptions, arg)
+		}
+	}
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -32,9 +52,9 @@ func main() {
 		if info.Mode().IsRegular() {
 			switch {
 			case strings.HasSuffix(path, ".zip"), strings.HasSuffix(path, ".gz"), strings.HasSuffix(path, ".tgz"), strings.HasSuffix(path, ".zstd"):
-				handleCompressedFile(path, pattern)
+				handleCompressedFile(path, pattern, agOptions)
 			default:
-				runAg(pattern, path)
+				runAg(pattern, path, agOptions)
 			}
 		}
 		return nil
@@ -47,18 +67,27 @@ func main() {
 	cleanupLogs(dir)
 }
 
-func runAg(pattern, path string) {
-	cmd := exec.Command("ag", "--color", pattern, path)
+func runAg(pattern, path string, options []string) {
+	cmdArgs := append(options, pattern, path)
+	cmd := exec.Command("ag", cmdArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("Error running ag on %s: %s\n", path, err)
+		// if exit status is 1, it means no results were found
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				return
+			}
+		}
+		fmt.Printf("Error running ag on %s: %s\n", path, output)
 		return
 	}
-	fmt.Printf("Results for %s:\n%s\n", path, output)
+	// Print results using Magenta color for "Results for "
+	fmt.Printf("%sResults for %s%s:\n%s\n", Magenta, path, Reset, string(output))
+
 }
 
-func handleCompressedFile(path, pattern string) {
-	fmt.Printf("Handling compressed file: %s\n", path)
+func handleCompressedFile(path, pattern string, options []string) {
+	// fmt.Printf("Handling compressed file: %s\n", path)
 	ext := filepath.Ext(path)
 
 	var reader io.ReadCloser
@@ -70,7 +99,7 @@ func handleCompressedFile(path, pattern string) {
 	defer file.Close()
 
 	switch ext {
-	case ".gz", ".tgz":
+	case ".gz":
 		if reader, err = gzip.NewReader(file); err != nil {
 			fmt.Printf("Error creating gzip reader for %s: %s\n", path, err)
 			return
@@ -91,7 +120,7 @@ func handleCompressedFile(path, pattern string) {
 				fmt.Printf("Error opening zip file content %s: %s\n", f.Name, err)
 				return
 			}
-			runAgThroughReader(pattern, reader, f.Name)
+			runAgThroughReader(pattern, reader, f.Name, options)
 			reader.Close()
 		}
 		return
@@ -108,25 +137,32 @@ func handleCompressedFile(path, pattern string) {
 		return
 	}
 
-	runAgThroughReader(pattern, reader, path)
+	runAgThroughReader(pattern, reader, path, options)
 	reader.Close()
 }
 
-func runAgThroughReader(pattern string, reader io.Reader, name string) {
-	tempFile, err := ioutil.TempFile("", "*.tmp")
+// runAgThroughReader reads data from a reader and directly pipes it to the `ag` command
+func runAgThroughReader(pattern string, reader io.Reader, name string, options []string) {
+	// Prepare the ag command with given options
+	cmdArgs := append(options, pattern)
+	cmd := exec.Command("ag", cmdArgs...)
+	cmd.Stdin = reader // Set the command's Stdin to the reader
+
+	// Execute the command and capture the output
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("Error creating temp file for %s: %s\n", name, err)
+		// if exit status is 1, it means no results were found
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				return
+			}
+		}
+		fmt.Printf("Error running ag through reader for %s: %s\n", name, err)
 		return
 	}
-	defer os.Remove(tempFile.Name())
 
-	if _, err = io.Copy(tempFile, reader); err != nil {
-		fmt.Printf("Error copying to temp file for %s: %s\n", name, err)
-		return
-	}
-
-	runAg(pattern, tempFile.Name())
-	tempFile.Close()
+	// Print results
+	fmt.Printf("%sResults for %s%s (from stream):\n%s\n", Magenta, name, Reset, string(output))
 }
 
 func cleanupLogs(dir string) {
