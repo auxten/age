@@ -22,11 +22,19 @@ Install `age` directly from the source using Go:
 go install github.com/auxten/age@latest
 ```
 
+
 This command fetches the latest version of `age` from the GitHub repository and installs it.
 
 ## Usage
 
 Use `age` exactly like `ag`. Here are some example commands to get started:
+
+Please make sure that the Go binary directory is in your `PATH`.
+or you can use the following command:
+
+```bash
+export PATH=$PATH:$(go env GOPATH)/bin
+```
 
 ```bash
 # Perform a basic search
@@ -38,6 +46,22 @@ age -i "search pattern" /path/to/search
 # Search within compressed files
 age "pattern" /path/with/compressed/files
 ```
+
+## With iterm2
+
+It's highly recommended to use iterm2 with age. iterm2 has a feature called "Semantic History" which allows you to search through the output of the terminal. 
+This feature is very useful when you are searching for a specific command you ran in the past. But if you close the terminal, the history is gone.
+You can let iterm2 save all the output of the terminal to a directory. This way you can search through the output of the terminal even after you close the terminal.
+
+But the output of the terminal can be very large and take up a lot of disk space. age can help you with that. 
+age can compress the log files automatically after a certain amount of time.
+
+To activate the session logs, go to iTerm2 Preferences (⌘,), select the "Profiles" tab, then the "Session" tab. 
+Under "Miscellaneous" you can specify a folder where log files for your sessions shall be saved in the future.
+
+![iterm2](iterm2.png)
+
+See: https://stackoverflow.com/a/35798807/896026
 
 
 ### Automatic Log File Compression
