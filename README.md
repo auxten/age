@@ -63,6 +63,13 @@ Under "Miscellaneous" you can specify a folder where log files for your sessions
 
 See: https://stackoverflow.com/a/35798807/896026
 
+You can also make a shell function to search your iterm2 session logs:
+
+```bash
+agl() {
+    age "$1" ~/Documents/itermLog # change the path to your iterm2 log directory
+}
+```
 
 ### Automatic Log File Compression
 
