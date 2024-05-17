@@ -1,28 +1,66 @@
-# This workflow will build a golang project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
-
-name: Go
+name: Release Binaries
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  release:
+    types: [created]
 
 jobs:
-
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: darwin
+
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v2
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v2
       with:
         go-version: '1.20'
 
-    - name: Build
-      run: go build -v ./...
+    - name: Build binary
+      run: |
+        GOOS=${{ matrix.platform }} GOARCH=amd64 go build -o age-${{ matrix.platform }} ./cmd/age
 
-    # - name: Test
-    #   run: go test -v ./...
+    - name: Zip the binary
+      run: zip age-${{ matrix.platform }}-${{ github.sha }}.zip age-${{ matrix.platform }}
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: age-${{ matrix.platform }}-${{ github.sha }}.zip
+        path: age-${{ matrix.platform }}-${{ github.sha }}.zip
+
+  upload-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v2
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./age-${{ matrix.platform }}-${{ github.sha }}.zip
+        asset_name: age-${{ matrix.platform }}-${{ github.sha }}.zip
+        asset_content_type: application/zip
