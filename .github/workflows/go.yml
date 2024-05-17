@@ -2,7 +2,7 @@ name: Release Binaries
 
 on:
   release:
-    types: [created]
+    types: [published, created]
 
 jobs:
   build:
@@ -31,36 +31,12 @@ jobs:
     - name: Zip the binary
       run: zip age-${{ matrix.platform }}-${{ github.sha }}.zip age
 
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
-      with:
-        name: age-${{ matrix.platform }}-${{ github.sha }}.zip
-        path: age-${{ matrix.platform }}-${{ github.sha }}.zip
-
-  upload-release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v2
-
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
-        draft: false
-        prerelease: false
-
-    - name: Upload Release Asset
+    - name: Upload Artifact to Existing Release
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        upload_url: ${{ github.event.release.upload_url }}
         asset_path: ./age-${{ matrix.platform }}-${{ github.sha }}.zip
         asset_name: age-${{ matrix.platform }}-${{ github.sha }}.zip
         asset_content_type: application/zip
