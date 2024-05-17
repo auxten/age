@@ -1,4 +1,4 @@
-module github.com/auxten/greplogs
+module github.com/auxten/age
 
 go 1.18
 
