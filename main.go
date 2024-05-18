@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/spf13/pflag"
 )
 
 // ANSI color codes
@@ -23,27 +22,43 @@ const (
 )
 
 func main() {
-	pflag.CommandLine.ParseErrorsWhitelist.UnknownFlags = true
-	pflag.Parse()
-
-	// Remaining arguments after parsing flags
-	args := pflag.Args()
-	if len(args) < 2 {
-		fmt.Println("Usage: age [options] PATTERN dir")
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: gl [ag-options] PATTERN [dir]")
 		os.Exit(1)
 	}
 
-	pattern := args[0]
-	dir := args[1]
+	// Collect command-line arguments
+	args := os.Args[1:]
+	agOptions := []string{}
+	var pattern, dir string
 
-	// Collect all non-parsed options, which might be intended for `ag`
-	var agOptions []string
-	for _, arg := range os.Args[1:] {
-		if strings.HasPrefix(arg, "-") {
-			agOptions = append(agOptions, arg)
+	// Determine if the last argument is a directory
+	if len(args) > 1 && !strings.HasPrefix(args[len(args)-1], "-") {
+		if info, err := os.Stat(args[len(args)-1]); err == nil && info.IsDir() {
+			dir = args[len(args)-1]
+			args = args[:len(args)-1] // Remove directory from args
 		}
 	}
 
+	// Pattern is the last argument now
+	if len(args) > 0 {
+		pattern = args[len(args)-1]
+		agOptions = args[:len(args)-1]
+	}
+
+	if pattern == "" {
+		fmt.Println("Pattern must be provided.")
+		os.Exit(1)
+	}
+
+	// If no directory specified, use current working directory
+	if dir == "" {
+		dir, _ = os.Getwd()
+	}
+
+	// fmt.Printf("Pattern: %s\nDirectory: %s\nAG Options: %v\n", pattern, dir, agOptions)
+
+	// Walk through the directory structure
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -72,18 +87,15 @@ func runAg(pattern, path string, options []string) {
 	cmd := exec.Command("ag", cmdArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// if exit status is 1, it means no results were found
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			if exitErr.ExitCode() == 1 {
 				return
 			}
 		}
-		fmt.Printf("Error running ag on %s: %s\n", path, output)
+		fmt.Printf("Error running ag on %s: %s\n", path, string(output))
 		return
 	}
-	// Print results using Magenta color for "Results for "
 	fmt.Printf("%sResults for %s%s:\n%s\n", Magenta, path, Reset, string(output))
-
 }
 
 func handleCompressedFile(path, pattern string, options []string) {
