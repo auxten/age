@@ -71,7 +71,7 @@ You can also make a shell function to search your iterm2 session logs:
 
 ```bash
 agl() {
-    age "$1" ~/Documents/itermLog # change the path to your iterm2 log directory
+    age "$@" ~/Documents/itermLog # change the path to your iterm2 log directory
 }
 ```
 
